@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  avatar    String?
+  role      Role     @default(READER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bookmarks      Bookmark[]
+  comments       Comment[]
+  ratings        Rating[]
+  readingHistory ReadingHistory[]
+
+  @@map("users")
+}
+
+enum Role {
+  READER
+  AUTHOR
+  ADMIN
+}
+
+model Comic {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  description String   @db.Text
+  coverImage  String   @map("cover_image")
+  bannerImage String?  @map("banner_image")
+  status      Status   @default(ONGOING)
+  author      String
+  artist      String?
+  featured    Boolean  @default(false)
+  views       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  chapters  Chapter[]
+  genres    GenreOnComic[]
+  bookmarks Bookmark[]
+  comments  Comment[]
+  ratings   Rating[]
+
+  @@map("comics")
+}
+
+enum Status {
+  ONGOING
+  COMPLETED
+  HIATUS
+}
+
+model Chapter {
+  id          String   @id @default(uuid())
+  number      Int
+  title       String?
+  pages       String[]
+  publishedAt DateTime @default(now()) @map("published_at")
+  views       Int      @default(0)
+
+  comicId String @map("comic_id")
+  comic   Comic  @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  comments       Comment[]
+  readingHistory ReadingHistory[]
+
+  @@unique([comicId, number])
+  @@map("chapters")
+}
+
+model Genre {
+  id          String @id @default(uuid())
+  name        String @unique
+  slug        String @unique
+  description String?
+  color       String @default("#9B59B6")
+
+  comics GenreOnComic[]
+
+  @@map("genres")
+}
+
+model GenreOnComic {
+  comicId String @map("comic_id")
+  genreId String @map("genre_id")
+
+  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([comicId, genreId])
+  @@map("genre_on_comic")
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId  String @map("user_id")
+  comicId String @map("comic_id")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, comicId])
+  @@map("bookmarks")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  comicId   String? @map("comic_id")
+  comic     Comic?  @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  chapterId String? @map("chapter_id")
+  chapter   Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  parentId String?   @map("parent_id")
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  score     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId  String @map("user_id")
+  comicId String @map("comic_id")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, comicId])
+  @@map("ratings")
+}
+
+model ReadingHistory {
+  id         String   @id @default(uuid())
+  pageNumber Int      @default(1) @map("page_number")
+  readAt     DateTime @default(now()) @map("read_at")
+
+  userId    String @map("user_id")
+  chapterId String @map("chapter_id")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId])
+  @@map("reading_history")
+}
